@@ -72,8 +72,6 @@ class CoordinateConversion:
         self.dlg.loadFileButton.hide()
         self.dlg.loadLayerPrompt.hide()
         self.dlg.layerSelect.hide()
-        self.dlg.newLayerName_Label.hide()
-        self.dlg.newLayerName.hide()
         
         self.toolbar = self.iface.addToolBar(u'CoordinateConversion')
         self.toolbar.setObjectName(u'CoordinateConversion')
@@ -84,7 +82,6 @@ class CoordinateConversion:
         self.dlg.convertButton.clicked.connect(self.calculateAndShow)
         self.dlg.importFromText.toggled.connect(self.importFromText_selected)
         self.dlg.importFromLayer.toggled.connect(self.importFromLayer_selected)
-        self.dlg.checkNewLayer.stateChanged.connect(self.checkNewLayer_stateChanged)
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -210,14 +207,6 @@ class CoordinateConversion:
         self.dlg.loadLayerPrompt.show()
         self.dlg.layerSelect.show()
         self.dlg.inputInstruction.hide()
-
-    def checkNewLayer_stateChanged(self):
-        if (self.dlg.checkNewLayer.isChecked()):
-            self.dlg.newLayerName_Label.show()
-            self.dlg.newLayerName.show()
-        else:
-            self.dlg.newLayerName_Label.hide()
-            self.dlg.newLayerName.hide()
             
     def select_input_file(self):
         loadFileName = QFileDialog.getOpenFileName(self.dlg, "Open text file", "", "*.txt")
@@ -234,30 +223,47 @@ class CoordinateConversion:
         p2y1 += yDiff
         leg = math.sqrt(math.pow((p2x1 - p1x1),2)+ math.pow((p2y1 - p1y1),2))
         base = math.sqrt(math.pow((p2x2 - p2x1),2) + math.pow((p2y2 - p2y1),2))
+        
+        #angleUnder90 = base < leg * math.sqrt(2)
+        #angleOver90 = base > leg * math.sqrt(2)        
+        #sign = 0
+        #slopeNew = 0
+        #slopeBase = 0
+        #if (p2x2 - p1x1 != 0):
+        #    slopeNew = (p2y2 - p1y1)/(p2x2 - p1x1)
+        #if (p2x2 - p2x1 != 0):        
+        #    slopeBase = (p2y2 - p2y1)/(p2x2 - p2x1)
+        #    
+        #if (p2x2 - p1x1 != 0) and (p2x2 - p2x1 != 0):
+        #    if angleUnder90 and (slopeBase > slopeNew) or (slopeBase < 0):
+        #        sign = 1
+        #    if angleOver90 and (slopeBase > slopeNew) or (slopeBase < 0):
+        #        sign = -1
+        #    if angleUnder90 and(0 < slopeBase < slopeNew):
+        #        sign = -1
+        #    if angleOver90 and(0 < slopeBase < slopeNew):
+        #        sign = -1
+        #if (p2x2 - p1x1 == 0):
+        #    if (slopeBase > 0):
+        #        sign = -1
+        #    if (slopeBase <0):
+        #        sign = 1
+        #if (p2x2 - p2x1 == 0):
+        #    if (slopeNew > 0):
+        #        sign = 1
+        #    if (slopeNew < 0):
+        #        sign = -1
+        
+        angle = 2 * math.asin((base / 2)/leg)
         sign = 0
-        slopeNew = 0
-        slopeBase = 0
-        if (p2x2 - p1x1 != 0):
-            slopeNew = (p2y2 - p1y1)/(p2x2 - p1x1)
-        if (p2x2 - p2x1 != 0):        
-            slopeBase = (p2y2 - p2y1)/(p2x2 - p2x1)
-        if (p2x2 - p1x1 != 0) and (p2x2 - p2x1 != 0):
-            if (slopeBase > slopeNew) or (slopeBase < 0):
-                sign = 1
-            if (0 < slopeBase < slopeNew):
-                sign = -1
-        if (p2x2 - p1x1 == 0):
-            if (slopeBase > 0):
-                sign = -1
-            if (slopeBase <0):
-                sign = 1
-        if (p2x2 - p2x1 == 0):
-            if (slopeNew > 0):
-                sign = 1
-            if (slopeNew < 0):
-                sign = -1
-        angle = sign * 2 * math.asin((base / 2)/leg)
-        return angle
+        xMatch = format(p2x2, '.2f') == format(math.cos(angle) * (p2x1 - p1x1) - math.sin(angle) * (p2y1 - p1y1) + p1x1, '.2f')
+        yMatch = format(p2y2, '.2f') == format(math.sin(angle) * (p2x1 - p1x1) + math.cos(angle) * (p2y1 - p1y1) + p1y1, '.2f')
+        if xMatch and yMatch:
+            sign = 1
+        else:
+            sign = -1
+        finalAngle = sign * angle
+        return finalAngle
     
     def getOriginalPoints(self):
         originalPoints = []
@@ -273,7 +279,7 @@ class CoordinateConversion:
         pointFile = open(pointFileName, 'r')
         fileLines = pointFile.readlines()
         for q in range (1, len(fileLines)):
-            tempString = fileLines[q]
+            tempString = fileLines[q].rstrip()
             tempList = tempString.split(",")
             tempPoint = gisPoint(tempList[0], tempList[1], tempList[2], tempList[3], tempList[4])
             filePoints.append(tempPoint)
@@ -305,9 +311,12 @@ class CoordinateConversion:
         xTranslation = pt1x2 - pt1x1
         yTranslation = pt1y2 - pt1y1
         angle = self.calculateAngle(pt1x1, pt1y1, pt1x2, pt1y2, pt2x1, pt2y1, pt2x2, pt2y2, xTranslation, yTranslation)
-        headerFileName = self.dlg.inputFile.text()
-        headerFile = open(headerFileName, 'r')
-        outputString = headerFile.readline()
+        if self.dlg.importFromLayer.isChecked():
+            outputString = "Name, Type, X, Y, Height"
+        else:
+            headerFileName = self.dlg.inputFile.text()
+            headerFile = open(headerFileName, 'r')
+            outputString = headerFile.readline()
         originalPoints = []
         originalPoints = self.getOriginalPoints();
         convertedPoints = []
@@ -319,22 +328,13 @@ class CoordinateConversion:
             outputString += convertedPoints[c].getPointAsString()
         self.showOutputInDialog(outputString)
         self.saveNewPointFile(outputString)
-        if (self.dlg.checkNewLayer.isChecked()):
-            self.saveNewLayer()
     
     def saveNewPointFile(self, newText):
         fileName = self.dlg.outputFile.text()
         newFile = open(fileName, 'w')
         newFile.write(newText)
         newFile.close()
-        
-    def saveNewLayer(self):
-        filePath = "file:///" + self.dlg.outputFile.text() + "?delimiter=%s&xField=%s&yField=%s"
-        uri = filePath % (",", "x", "y") 
-        layerName = self.dlg.newLayerName.text()
-        vlayer = QgsVectorLayer(uri, layerName, "delimitedtext")
-        QgsMapLayerRegistry.instance().addMapLayer(vlayer)
-    
+
     def showOutputInDialog(self, output):
         pointDialog = QMessageBox()
         pointDialog.setWindowTitle("Converted Points")
@@ -400,7 +400,7 @@ class gisPoint:
         return float(self.height)
         
     def getPointAsString(self):
-        return self.name + ", " + str(self.type) + ", " + str(self.x) + ", " + str(self.y) + ", " + str(self.height)
+        return self.name + ", " + str(self.type) + ", " + str(self.x) + ", " + str(self.y) + ", " + str(self.height)  + "\n"
         
     def convertPoint(self, xTrans, yTrans, rotPtX, rotPtY, angle):
         movedX = float(self.x) + xTrans

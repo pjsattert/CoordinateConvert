@@ -14,10 +14,10 @@ version=0.1
 author=Peter Satterthwaite
 email=pjsattert@gmail.com
 
-about=This plugin converts points from one 2D coordinate grid system to another. It is designed to convert measurements taken on a custom coordinate grid (e.g. on an archaeological dig) to another coordinate system.
+about=...
 
-tracker=https://github.com/pjsattert/CoordinateConvert/issues
-repository=https://github.com/pjsattert/CoordinateConvert/
+tracker=github.com
+repository=github.com
 # End of mandatory metadata
 
 # Recommended items:
